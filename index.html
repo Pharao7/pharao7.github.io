@@ -149,6 +149,12 @@
             border-radius: 8px;
             color: #fecaca;
         }
+
+        .other-file-icon {
+            font-size: 50px;
+            text-align: center;
+            padding: 30px 0;
+        }
     </style>
 </head>
 
@@ -181,30 +187,49 @@
 <script>
 
     /* =====================================================
-       HIER DEINE GITHUB-DATEN EINTRAGEN
+       GITHUB EINSTELLUNGEN
        ===================================================== */
 
     const GITHUB_USER = "Pharao7";
-
     const REPOSITORY = "pharao7.github.io";
-
     const BRANCH = "main";
 
 
     /* =====================================================
-       AB HIER MUSST DU NICHTS MEHR ÄNDERN
+       AUTOMATISCHE KONFIGURATION
        ===================================================== */
 
     const API_URL =
         `https://api.github.com/repos/${GITHUB_USER}/${REPOSITORY}/git/trees/${BRANCH}?recursive=1`;
 
+
+    /*
+       WICHTIG:
+
+       Wenn das Repository genauso heißt wie:
+       Benutzername.github.io
+
+       dann lautet die Basis-URL:
+
+       https://benutzername.github.io/
+
+       und NICHT:
+
+       https://benutzername.github.io/benutzername.github.io/
+    */
+
     const PAGE_BASE =
-        `https://${GITHUB_USER}.github.io/${REPOSITORY}/`;
+        REPOSITORY.toLowerCase() === `${GITHUB_USER.toLowerCase()}.github.io`
+            ? `https://${GITHUB_USER.toLowerCase()}.github.io/`
+            : `https://${GITHUB_USER.toLowerCase()}.github.io/${REPOSITORY}/`;
+
 
     let allFiles = [];
 
 
-    // Unterstützte Dateitypen
+    /* =====================================================
+       UNTERSTÜTZTE DATEITYPEN
+       ===================================================== */
 
     const IMAGE_TYPES = [
         "jpg",
@@ -212,7 +237,8 @@
         "png",
         "gif",
         "webp",
-        "svg"
+        "svg",
+        "bmp"
     ];
 
     const AUDIO_TYPES = [
@@ -220,11 +246,14 @@
         "wav",
         "ogg",
         "m4a",
-        "aac"
+        "aac",
+        "flac"
     ];
 
 
-    // Dateien von GitHub laden
+    /* =====================================================
+       DATEIEN VON GITHUB LADEN
+       ===================================================== */
 
     async function loadFiles() {
 
@@ -242,9 +271,15 @@
 
             const data = await response.json();
 
+
             allFiles = data.tree
+
+                // Nur Dateien anzeigen
                 .filter(item => item.type === "blob")
+
+                // index.html selbst nicht anzeigen
                 .filter(item => item.path !== "index.html")
+
                 .map(item => {
 
                     const extension =
@@ -253,29 +288,60 @@
                             .pop()
                             .toLowerCase();
 
+
                     let type = "other";
+
 
                     if (IMAGE_TYPES.includes(extension)) {
                         type = "image";
                     }
 
+
                     if (AUDIO_TYPES.includes(extension)) {
                         type = "audio";
                     }
 
+
+                    /*
+                       KORREKTE GITHUB-PAGES-URL ERSTELLEN
+
+                       Beispiel:
+
+                       GitHub-Datei:
+                       quiz dateien/Bild.png
+
+                       wird zu:
+
+                       https://pharao7.github.io/quiz%20dateien/Bild.png
+                    */
+
+                    const fileUrl =
+                        PAGE_BASE +
+                        item.path
+                            .split("/")
+                            .map(part => encodeURIComponent(part))
+                            .join("/");
+
+
                     return {
+
                         path: item.path,
-                        name: item.path.split("/").pop(),
-                        extension: extension,
-                        type: type,
-                        url: PAGE_BASE +
+
+                        name:
                             item.path
                                 .split("/")
-                                .map(encodeURIComponent)
-                                .join("/")
+                                .pop(),
+
+                        extension: extension,
+
+                        type: type,
+
+                        url: fileUrl
+
                     };
 
                 });
+
 
             status.style.display = "none";
 
@@ -287,12 +353,20 @@
 
             status.innerHTML = `
                 <div class="error">
-                    <strong>Dateien konnten nicht geladen werden.</strong>
+
+                    <strong>
+                        Dateien konnten nicht geladen werden.
+                    </strong>
+
                     <br><br>
+
                     ${error.message}
+
                     <br><br>
+
                     Prüfe GitHub-Benutzername,
                     Repository und Branch.
+
                 </div>
             `;
 
@@ -301,7 +375,9 @@
     }
 
 
-    // Dateien anzeigen
+    /* =====================================================
+       DATEIEN ANZEIGEN
+       ===================================================== */
 
     function renderFiles(files) {
 
@@ -311,20 +387,30 @@
         const counter =
             document.getElementById("counter");
 
+
         content.innerHTML = "";
+
 
         counter.textContent =
             `${files.length} Datei(en) gefunden`;
 
 
         const images =
-            files.filter(file => file.type === "image");
+            files.filter(
+                file => file.type === "image"
+            );
+
 
         const audio =
-            files.filter(file => file.type === "audio");
+            files.filter(
+                file => file.type === "audio"
+            );
+
 
         const others =
-            files.filter(file => file.type === "other");
+            files.filter(
+                file => file.type === "other"
+            );
 
 
         if (images.length > 0) {
@@ -370,24 +456,30 @@
     }
 
 
-    // Bereich erstellen
+    /* =====================================================
+       BEREICH ERSTELLEN
+       ===================================================== */
 
     function createSection(title, files, container) {
 
         const heading =
             document.createElement("h2");
 
+
         heading.className =
             "section-title";
 
+
         heading.textContent =
             `${title} (${files.length})`;
+
 
         container.appendChild(heading);
 
 
         const grid =
             document.createElement("div");
+
 
         grid.className =
             "grid";
@@ -407,108 +499,165 @@
     }
 
 
-    // Datei-Karte erstellen
+    /* =====================================================
+       DATEI-KARTE ERSTELLEN
+       ===================================================== */
 
     function createCard(file) {
 
         const card =
             document.createElement("div");
 
+
         card.className =
             "card";
 
 
-        // Bildvorschau
+        /* -----------------------------
+           BILDVORSCHAU
+           ----------------------------- */
 
         if (file.type === "image") {
 
             const img =
                 document.createElement("img");
 
+
             img.src =
                 file.url;
+
 
             img.loading =
                 "lazy";
 
+
             img.alt =
                 file.name;
+
 
             card.appendChild(img);
 
         }
 
 
-        // Audio Player
+        /* -----------------------------
+           AUDIO PLAYER
+           ----------------------------- */
 
-        if (file.type === "audio") {
+        else if (file.type === "audio") {
 
             const audio =
                 document.createElement("audio");
 
+
             audio.controls =
                 true;
+
 
             audio.preload =
                 "none";
 
+
             audio.src =
                 file.url;
+
 
             card.appendChild(audio);
 
         }
 
 
-        // Dateiname
+        /* -----------------------------
+           SONSTIGE DATEIEN
+           ----------------------------- */
+
+        else {
+
+            const icon =
+                document.createElement("div");
+
+
+            icon.className =
+                "other-file-icon";
+
+
+            icon.textContent =
+                "📄";
+
+
+            card.appendChild(icon);
+
+        }
+
+
+        /* -----------------------------
+           DATEINAME
+           ----------------------------- */
 
         const filename =
             document.createElement("div");
 
+
         filename.className =
             "filename";
+
 
         filename.textContent =
             file.name;
 
+
         card.appendChild(filename);
 
 
-        // Dateipfad
+        /* -----------------------------
+           DATEIPFAD
+           ----------------------------- */
 
         const filepath =
             document.createElement("div");
 
+
         filepath.className =
             "filepath";
+
 
         filepath.textContent =
             file.path;
 
+
         card.appendChild(filepath);
 
 
-        // URL anzeigen
+        /* -----------------------------
+           URL ANZEIGEN
+           ----------------------------- */
 
         const url =
             document.createElement("div");
 
+
         url.className =
             "url";
+
 
         url.textContent =
             file.url;
 
+
         card.appendChild(url);
 
 
-        // Kopierbutton
+        /* -----------------------------
+           URL KOPIEREN BUTTON
+           ----------------------------- */
 
         const button =
             document.createElement("button");
 
+
         button.textContent =
             "📋 URL kopieren";
+
 
         button.addEventListener(
             "click",
@@ -520,17 +669,21 @@
                         file.url
                     );
 
+
                     button.textContent =
                         "✓ URL kopiert";
+
 
                     button.classList.add(
                         "copied"
                     );
 
+
                     setTimeout(() => {
 
                         button.textContent =
                             "📋 URL kopieren";
+
 
                         button.classList.remove(
                             "copied"
@@ -542,8 +695,13 @@
 
                 catch {
 
-                    alert(
-                        "URL konnte nicht kopiert werden:\n\n" +
+                    /*
+                       Falls Clipboard nicht funktioniert,
+                       wird die URL angezeigt.
+                    */
+
+                    prompt(
+                        "URL kopieren:",
                         file.url
                     );
 
@@ -551,6 +709,7 @@
 
             }
         );
+
 
         card.appendChild(button);
 
@@ -560,7 +719,9 @@
     }
 
 
-    // Suche
+    /* =====================================================
+       SUCHFUNKTION
+       ===================================================== */
 
     document
         .getElementById("search")
@@ -573,12 +734,16 @@
                         .toLowerCase()
                         .trim();
 
+
                 const filtered =
                     allFiles.filter(file =>
+
                         file.path
                             .toLowerCase()
                             .includes(search)
+
                     );
+
 
                 renderFiles(filtered);
 
@@ -586,7 +751,9 @@
         );
 
 
-    // Start
+    /* =====================================================
+       START
+       ===================================================== */
 
     loadFiles();
 
