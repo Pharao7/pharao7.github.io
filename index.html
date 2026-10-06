@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Quiz Media</title>
 
     <style>
@@ -43,7 +44,7 @@
         .search {
             width: 100%;
             padding: 14px 16px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             border-radius: 8px;
             border: 1px solid #374151;
             background: #1f2937;
@@ -53,6 +54,11 @@
 
         .search:focus {
             outline: 2px solid #3b82f6;
+        }
+
+        .counter {
+            color: #9ca3af;
+            margin-bottom: 20px;
         }
 
         .status {
@@ -69,7 +75,10 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(
+                auto-fill,
+                minmax(280px, 1fr)
+            );
             gap: 18px;
         }
 
@@ -137,9 +146,21 @@
             background: #059669;
         }
 
-        .counter {
-            color: #9ca3af;
-            margin-bottom: 15px;
+        .open-button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            border-radius: 6px;
+            background: #374151;
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .open-button:hover {
+            background: #4b5563;
         }
 
         .error {
@@ -154,6 +175,12 @@
             font-size: 50px;
             text-align: center;
             padding: 30px 0;
+        }
+
+        .empty {
+            color: #9ca3af;
+            text-align: center;
+            padding: 30px;
         }
     </style>
 </head>
@@ -174,9 +201,14 @@
         placeholder="🔎 Datei suchen..."
     >
 
-    <div id="counter" class="counter"></div>
+    <div
+        id="counter"
+        class="counter">
+    </div>
 
-    <div id="status" class="status">
+    <div
+        id="status"
+        class="status">
         Dateien werden geladen...
     </div>
 
@@ -184,51 +216,59 @@
 
 </div>
 
+
 <script>
 
     /* =====================================================
-       GITHUB EINSTELLUNGEN
+       GITHUB KONFIGURATION
        ===================================================== */
 
     const GITHUB_USER = "Pharao7";
+
     const REPOSITORY = "pharao7.github.io";
+
     const BRANCH = "main";
 
 
     /* =====================================================
-       AUTOMATISCHE KONFIGURATION
+       WICHTIG:
+       
+       Dies ist deine FESTE GitHub-Pages-Adresse.
+       
+       Der Repository-Name wird hier NICHT angehängt.
+       
+       Dadurch entsteht NICHT mehr:
+       
+       pharao7.github.io/pharao7.github.io/...
+       
+       sondern:
+       
+       pharao7.github.io/...
+       ===================================================== */
+
+    const PAGE_BASE =
+        "https://pharao7.github.io/";
+
+
+    /* =====================================================
+       GITHUB API
        ===================================================== */
 
     const API_URL =
-        `https://api.github.com/repos/${GITHUB_USER}/${REPOSITORY}/git/trees/${BRANCH}?recursive=1`;
-
-
-    /*
-       WICHTIG:
-
-       Wenn das Repository genauso heißt wie:
-       Benutzername.github.io
-
-       dann lautet die Basis-URL:
-
-       https://benutzername.github.io/
-
-       und NICHT:
-
-       https://benutzername.github.io/benutzername.github.io/
-    */
-
-    const PAGE_BASE =
-        REPOSITORY.toLowerCase() === `${GITHUB_USER.toLowerCase()}.github.io`
-            ? `https://${GITHUB_USER.toLowerCase()}.github.io/`
-            : `https://${GITHUB_USER.toLowerCase()}.github.io/${REPOSITORY}/`;
+        "https://api.github.com/repos/" +
+        GITHUB_USER +
+        "/" +
+        REPOSITORY +
+        "/git/trees/" +
+        BRANCH +
+        "?recursive=1";
 
 
     let allFiles = [];
 
 
     /* =====================================================
-       UNTERSTÜTZTE DATEITYPEN
+       DATEITYPEN
        ===================================================== */
 
     const IMAGE_TYPES = [
@@ -241,6 +281,7 @@
         "bmp"
     ];
 
+
     const AUDIO_TYPES = [
         "mp3",
         "wav",
@@ -252,123 +293,225 @@
 
 
     /* =====================================================
+       DATEI-URL ERSTELLEN
+       ===================================================== */
+
+    function createFileUrl(path) {
+
+        /*
+            Beispiel:
+
+            path:
+            quiz dateien/Bild.png
+
+            Ergebnis:
+            https://pharao7.github.io/quiz%20dateien/Bild.png
+        */
+
+        const encodedPath =
+            path
+                .split("/")
+                .map(function(part) {
+                    return encodeURIComponent(part);
+                })
+                .join("/");
+
+
+        return PAGE_BASE + encodedPath;
+
+    }
+
+
+    /* =====================================================
        DATEIEN VON GITHUB LADEN
        ===================================================== */
 
     async function loadFiles() {
 
-        const status = document.getElementById("status");
+        const status =
+            document.getElementById("status");
+
 
         try {
 
-            const response = await fetch(API_URL);
+            const response =
+                await fetch(API_URL);
+
 
             if (!response.ok) {
+
                 throw new Error(
-                    `GitHub API Fehler: ${response.status}`
+                    "GitHub API Fehler: " +
+                    response.status
                 );
+
             }
 
-            const data = await response.json();
+
+            const data =
+                await response.json();
 
 
-            allFiles = data.tree
+            if (!data.tree) {
 
-                // Nur Dateien anzeigen
-                .filter(item => item.type === "blob")
+                throw new Error(
+                    "GitHub hat keine Dateiliste zurückgegeben."
+                );
 
-                // index.html selbst nicht anzeigen
-                .filter(item => item.path !== "index.html")
-
-                .map(item => {
-
-                    const extension =
-                        item.path
-                            .split(".")
-                            .pop()
-                            .toLowerCase();
+            }
 
 
-                    let type = "other";
+            allFiles =
+                data.tree
+
+                    /* Nur echte Dateien */
+
+                    .filter(function(item) {
+
+                        return item.type === "blob";
+
+                    })
 
 
-                    if (IMAGE_TYPES.includes(extension)) {
-                        type = "image";
-                    }
+                    /* index.html nicht anzeigen */
+
+                    .filter(function(item) {
+
+                        return (
+                            item.path.toLowerCase()
+                            !==
+                            "index.html"
+                        );
+
+                    })
 
 
-                    if (AUDIO_TYPES.includes(extension)) {
-                        type = "audio";
-                    }
+                    /* Dateiinformationen erstellen */
 
+                    .map(function(item) {
 
-                    /*
-                       KORREKTE GITHUB-PAGES-URL ERSTELLEN
-
-                       Beispiel:
-
-                       GitHub-Datei:
-                       quiz dateien/Bild.png
-
-                       wird zu:
-
-                       https://pharao7.github.io/quiz%20dateien/Bild.png
-                    */
-
-                    const fileUrl =
-                        PAGE_BASE +
-                        item.path
-                            .split("/")
-                            .map(part => encodeURIComponent(part))
-                            .join("/");
-
-
-                    return {
-
-                        path: item.path,
-
-                        name:
+                        const filename =
                             item.path
                                 .split("/")
-                                .pop(),
-
-                        extension: extension,
-
-                        type: type,
-
-                        url: fileUrl
-
-                    };
-
-                });
+                                .pop();
 
 
-            status.style.display = "none";
+                        const extension =
+                            filename
+                                .includes(".")
+                                ?
+                                filename
+                                    .split(".")
+                                    .pop()
+                                    .toLowerCase()
+                                :
+                                "";
 
-            renderFiles(allFiles);
+
+                        let type =
+                            "other";
+
+
+                        if (
+                            IMAGE_TYPES.includes(
+                                extension
+                            )
+                        ) {
+
+                            type = "image";
+
+                        }
+
+
+                        if (
+                            AUDIO_TYPES.includes(
+                                extension
+                            )
+                        ) {
+
+                            type = "audio";
+
+                        }
+
+
+                        return {
+
+                            path:
+                                item.path,
+
+                            name:
+                                filename,
+
+                            extension:
+                                extension,
+
+                            type:
+                                type,
+
+                            /*
+                                HIER wird ausschließlich
+                                PAGE_BASE + Dateipfad verwendet.
+
+                                Der Repository-Name wird
+                                NICHT eingefügt.
+                            */
+
+                            url:
+                                createFileUrl(
+                                    item.path
+                                )
+
+                        };
+
+                    });
+
+
+            /* Alphabetisch sortieren */
+
+            allFiles.sort(
+                function(a, b) {
+
+                    return a.path.localeCompare(
+                        b.path,
+                        "de",
+                        {
+                            numeric: true
+                        }
+                    );
+
+                }
+            );
+
+
+            status.style.display =
+                "none";
+
+
+            renderFiles(
+                allFiles
+            );
 
         }
 
         catch (error) {
 
-            status.innerHTML = `
-                <div class="error">
+            status.innerHTML =
+                '<div class="error">' +
 
-                    <strong>
-                        Dateien konnten nicht geladen werden.
-                    </strong>
+                '<strong>' +
+                'Dateien konnten nicht geladen werden.' +
+                '</strong>' +
 
-                    <br><br>
+                '<br><br>' +
 
-                    ${error.message}
+                error.message +
 
-                    <br><br>
+                '<br><br>' +
 
-                    Prüfe GitHub-Benutzername,
-                    Repository und Branch.
+                'Prüfe GitHub-Benutzername, ' +
+                'Repository und Branch.' +
 
-                </div>
-            `;
+                '</div>';
 
         }
 
@@ -382,34 +525,59 @@
     function renderFiles(files) {
 
         const content =
-            document.getElementById("content");
+            document.getElementById(
+                "content"
+            );
+
 
         const counter =
-            document.getElementById("counter");
+            document.getElementById(
+                "counter"
+            );
 
 
-        content.innerHTML = "";
+        content.innerHTML =
+            "";
 
 
         counter.textContent =
-            `${files.length} Datei(en) gefunden`;
+            files.length +
+            " Datei(en) gefunden";
 
 
         const images =
             files.filter(
-                file => file.type === "image"
+                function(file) {
+
+                    return (
+                        file.type === "image"
+                    );
+
+                }
             );
 
 
         const audio =
             files.filter(
-                file => file.type === "audio"
+                function(file) {
+
+                    return (
+                        file.type === "audio"
+                    );
+
+                }
             );
 
 
         const others =
             files.filter(
-                file => file.type === "other"
+                function(file) {
+
+                    return (
+                        file.type === "other"
+                    );
+
+                }
             );
 
 
@@ -449,7 +617,9 @@
         if (files.length === 0) {
 
             content.innerHTML =
-                "<p>Keine Dateien gefunden.</p>";
+                '<div class="empty">' +
+                'Keine Dateien gefunden.' +
+                '</div>';
 
         }
 
@@ -460,10 +630,16 @@
        BEREICH ERSTELLEN
        ===================================================== */
 
-    function createSection(title, files, container) {
+    function createSection(
+        title,
+        files,
+        container
+    ) {
 
         const heading =
-            document.createElement("h2");
+            document.createElement(
+                "h2"
+            );
 
 
         heading.className =
@@ -471,83 +647,104 @@
 
 
         heading.textContent =
-            `${title} (${files.length})`;
+            title +
+            " (" +
+            files.length +
+            ")";
 
 
-        container.appendChild(heading);
+        container.appendChild(
+            heading
+        );
 
 
         const grid =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
 
         grid.className =
             "grid";
 
 
-        files.forEach(file => {
+        files.forEach(
+            function(file) {
 
-            grid.appendChild(
-                createCard(file)
-            );
+                grid.appendChild(
+                    createCard(file)
+                );
 
-        });
+            }
+        );
 
 
-        container.appendChild(grid);
+        container.appendChild(
+            grid
+        );
 
     }
 
 
     /* =====================================================
-       DATEI-KARTE ERSTELLEN
+       DATEI-KARTE
        ===================================================== */
 
     function createCard(file) {
 
         const card =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
 
         card.className =
             "card";
 
 
-        /* -----------------------------
-           BILDVORSCHAU
-           ----------------------------- */
+        /* =================================================
+           BILD
+           ================================================= */
 
         if (file.type === "image") {
 
             const img =
-                document.createElement("img");
+                document.createElement(
+                    "img"
+                );
 
 
             img.src =
                 file.url;
 
 
-            img.loading =
-                "lazy";
-
-
             img.alt =
                 file.name;
 
 
-            card.appendChild(img);
+            img.loading =
+                "lazy";
+
+
+            card.appendChild(
+                img
+            );
 
         }
 
 
-        /* -----------------------------
-           AUDIO PLAYER
-           ----------------------------- */
+        /* =================================================
+           AUDIO
+           ================================================= */
 
-        else if (file.type === "audio") {
+        else if (
+            file.type === "audio"
+        ) {
 
             const audio =
-                document.createElement("audio");
+                document.createElement(
+                    "audio"
+                );
 
 
             audio.controls =
@@ -562,19 +759,23 @@
                 file.url;
 
 
-            card.appendChild(audio);
+            card.appendChild(
+                audio
+            );
 
         }
 
 
-        /* -----------------------------
-           SONSTIGE DATEIEN
-           ----------------------------- */
+        /* =================================================
+           SONSTIGE DATEI
+           ================================================= */
 
         else {
 
             const icon =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
 
             icon.className =
@@ -585,17 +786,21 @@
                 "📄";
 
 
-            card.appendChild(icon);
+            card.appendChild(
+                icon
+            );
 
         }
 
 
-        /* -----------------------------
+        /* =================================================
            DATEINAME
-           ----------------------------- */
+           ================================================= */
 
         const filename =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
 
         filename.className =
@@ -606,15 +811,19 @@
             file.name;
 
 
-        card.appendChild(filename);
+        card.appendChild(
+            filename
+        );
 
 
-        /* -----------------------------
+        /* =================================================
            DATEIPFAD
-           ----------------------------- */
+           ================================================= */
 
         const filepath =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
 
         filepath.className =
@@ -625,15 +834,19 @@
             file.path;
 
 
-        card.appendChild(filepath);
+        card.appendChild(
+            filepath
+        );
 
 
-        /* -----------------------------
-           URL ANZEIGEN
-           ----------------------------- */
+        /* =================================================
+           URL
+           ================================================= */
 
         const url =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
 
         url.className =
@@ -644,61 +857,64 @@
             file.url;
 
 
-        card.appendChild(url);
+        card.appendChild(
+            url
+        );
 
 
-        /* -----------------------------
-           URL KOPIEREN BUTTON
-           ----------------------------- */
+        /* =================================================
+           KOPIERBUTTON
+           ================================================= */
 
-        const button =
-            document.createElement("button");
+        const copyButton =
+            document.createElement(
+                "button"
+            );
 
 
-        button.textContent =
+        copyButton.textContent =
             "📋 URL kopieren";
 
 
-        button.addEventListener(
+        copyButton.addEventListener(
             "click",
-            async () => {
+            async function() {
 
                 try {
 
-                    await navigator.clipboard.writeText(
-                        file.url
-                    );
+                    await navigator.clipboard
+                        .writeText(
+                            file.url
+                        );
 
 
-                    button.textContent =
+                    copyButton.textContent =
                         "✓ URL kopiert";
 
 
-                    button.classList.add(
+                    copyButton.classList.add(
                         "copied"
                     );
 
 
-                    setTimeout(() => {
+                    setTimeout(
+                        function() {
 
-                        button.textContent =
-                            "📋 URL kopieren";
+                            copyButton.textContent =
+                                "📋 URL kopieren";
 
 
-                        button.classList.remove(
-                            "copied"
-                        );
+                            copyButton.classList.remove(
+                                "copied"
+                            );
 
-                    }, 1500);
+                        },
+                        1500
+                    );
 
                 }
 
-                catch {
-
-                    /*
-                       Falls Clipboard nicht funktioniert,
-                       wird die URL angezeigt.
-                    */
+                catch (error) {
 
                     prompt(
                         "URL kopieren:",
@@ -711,7 +927,44 @@
         );
 
 
-        card.appendChild(button);
+        card.appendChild(
+            copyButton
+        );
+
+
+        /* =================================================
+           DATEI DIREKT ÖFFNEN
+           ================================================= */
+
+        const openButton =
+            document.createElement(
+                "a"
+            );
+
+
+        openButton.className =
+            "open-button";
+
+
+        openButton.href =
+            file.url;
+
+
+        openButton.target =
+            "_blank";
+
+
+        openButton.rel =
+            "noopener noreferrer";
+
+
+        openButton.textContent =
+            "↗ Datei öffnen";
+
+
+        card.appendChild(
+            openButton
+        );
 
 
         return card;
@@ -720,14 +973,16 @@
 
 
     /* =====================================================
-       SUCHFUNKTION
+       SUCHE
        ===================================================== */
 
     document
-        .getElementById("search")
+        .getElementById(
+            "search"
+        )
         .addEventListener(
             "input",
-            event => {
+            function(event) {
 
                 const search =
                     event.target.value
@@ -736,16 +991,22 @@
 
 
                 const filtered =
-                    allFiles.filter(file =>
+                    allFiles.filter(
+                        function(file) {
 
-                        file.path
-                            .toLowerCase()
-                            .includes(search)
+                            return file.path
+                                .toLowerCase()
+                                .includes(
+                                    search
+                                );
 
+                        }
                     );
 
 
-                renderFiles(filtered);
+                renderFiles(
+                    filtered
+                );
 
             }
         );
