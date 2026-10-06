@@ -1,10 +1,597 @@
+```html
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quiz Media</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #111827;
+            color: #f3f4f6;
+        }
+
+        header {
+            background: #1f2937;
+            padding: 30px 20px;
+            text-align: center;
+            border-bottom: 1px solid #374151;
+        }
+
+        header h1 {
+            margin: 0 0 8px;
+        }
+
+        header p {
+            margin: 0;
+            color: #9ca3af;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            padding: 25px;
+        }
+
+        .search {
+            width: 100%;
+            padding: 14px 16px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            border: 1px solid #374151;
+            background: #1f2937;
+            color: white;
+            font-size: 16px;
+        }
+
+        .search:focus {
+            outline: 2px solid #3b82f6;
+        }
+
+        .status {
+            text-align: center;
+            color: #9ca3af;
+            margin: 30px;
+        }
+
+        .section-title {
+            margin-top: 35px;
+            border-bottom: 1px solid #374151;
+            padding-bottom: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 18px;
+        }
+
+        .card {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 10px;
+            padding: 15px;
+            overflow: hidden;
+        }
+
+        .card img {
+            width: 100%;
+            height: 180px;
+            object-fit: contain;
+            background: #111827;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .card audio {
+            width: 100%;
+            margin: 12px 0;
+        }
+
+        .filename {
+            font-weight: bold;
+            word-break: break-word;
+            margin-bottom: 5px;
+        }
+
+        .filepath {
+            font-size: 12px;
+            color: #9ca3af;
+            word-break: break-word;
+            margin-bottom: 12px;
+        }
+
+        .url {
+            background: #111827;
+            border-radius: 5px;
+            padding: 8px;
+            font-size: 11px;
+            word-break: break-all;
+            margin-bottom: 10px;
+            color: #93c5fd;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        button.copied {
+            background: #059669;
+        }
+
+        .counter {
+            color: #9ca3af;
+            margin-bottom: 15px;
+        }
+
+        .error {
+            background: #7f1d1d;
+            border: 1px solid #ef4444;
+            padding: 15px;
+            border-radius: 8px;
+            color: #fecaca;
+        }
+    </style>
 </head>
+
 <body>
-    <h1>Quiz Media funktioniert! 🎉</h1>
+
+<header>
+    <h1>🎮 Quiz Media</h1>
+    <p>Bilder & Audiodateien für mein Quiz</p>
+</header>
+
+<div class="container">
+
+    <input
+        id="search"
+        class="search"
+        type="text"
+        placeholder="🔎 Datei suchen..."
+    >
+
+    <div id="counter" class="counter"></div>
+
+    <div id="status" class="status">
+        Dateien werden geladen...
+    </div>
+
+    <div id="content"></div>
+
+</div>
+
+<script>
+
+    /* =====================================================
+       HIER DEINE GITHUB-DATEN EINTRAGEN
+       ===================================================== */
+
+    const GITHUB_USER = "DEIN-GITHUB-NAME";
+
+    const REPOSITORY = "quiz-media";
+
+    const BRANCH = "main";
+
+
+    /* =====================================================
+       AB HIER MUSST DU NICHTS MEHR ÄNDERN
+       ===================================================== */
+
+    const API_URL =
+        `https://api.github.com/repos/${GITHUB_USER}/${REPOSITORY}/git/trees/${BRANCH}?recursive=1`;
+
+    const PAGE_BASE =
+        `https://${GITHUB_USER}.github.io/${REPOSITORY}/`;
+
+    let allFiles = [];
+
+
+    // Unterstützte Dateitypen
+
+    const IMAGE_TYPES = [
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "webp",
+        "svg"
+    ];
+
+    const AUDIO_TYPES = [
+        "mp3",
+        "wav",
+        "ogg",
+        "m4a",
+        "aac"
+    ];
+
+
+    // Dateien von GitHub laden
+
+    async function loadFiles() {
+
+        const status = document.getElementById("status");
+
+        try {
+
+            const response = await fetch(API_URL);
+
+            if (!response.ok) {
+                throw new Error(
+                    `GitHub API Fehler: ${response.status}`
+                );
+            }
+
+            const data = await response.json();
+
+            allFiles = data.tree
+                .filter(item => item.type === "blob")
+                .filter(item => item.path !== "index.html")
+                .map(item => {
+
+                    const extension =
+                        item.path
+                            .split(".")
+                            .pop()
+                            .toLowerCase();
+
+                    let type = "other";
+
+                    if (IMAGE_TYPES.includes(extension)) {
+                        type = "image";
+                    }
+
+                    if (AUDIO_TYPES.includes(extension)) {
+                        type = "audio";
+                    }
+
+                    return {
+                        path: item.path,
+                        name: item.path.split("/").pop(),
+                        extension: extension,
+                        type: type,
+                        url: PAGE_BASE +
+                            item.path
+                                .split("/")
+                                .map(encodeURIComponent)
+                                .join("/")
+                    };
+
+                });
+
+            status.style.display = "none";
+
+            renderFiles(allFiles);
+
+        }
+
+        catch (error) {
+
+            status.innerHTML = `
+                <div class="error">
+                    <strong>Dateien konnten nicht geladen werden.</strong>
+                    <br><br>
+                    ${error.message}
+                    <br><br>
+                    Prüfe GitHub-Benutzername,
+                    Repository und Branch.
+                </div>
+            `;
+
+        }
+
+    }
+
+
+    // Dateien anzeigen
+
+    function renderFiles(files) {
+
+        const content =
+            document.getElementById("content");
+
+        const counter =
+            document.getElementById("counter");
+
+        content.innerHTML = "";
+
+        counter.textContent =
+            `${files.length} Datei(en) gefunden`;
+
+
+        const images =
+            files.filter(file => file.type === "image");
+
+        const audio =
+            files.filter(file => file.type === "audio");
+
+        const others =
+            files.filter(file => file.type === "other");
+
+
+        if (images.length > 0) {
+
+            createSection(
+                "🖼️ Bilder",
+                images,
+                content
+            );
+
+        }
+
+
+        if (audio.length > 0) {
+
+            createSection(
+                "🎵 Audio",
+                audio,
+                content
+            );
+
+        }
+
+
+        if (others.length > 0) {
+
+            createSection(
+                "📁 Sonstige Dateien",
+                others,
+                content
+            );
+
+        }
+
+
+        if (files.length === 0) {
+
+            content.innerHTML =
+                "<p>Keine Dateien gefunden.</p>";
+
+        }
+
+    }
+
+
+    // Bereich erstellen
+
+    function createSection(title, files, container) {
+
+        const heading =
+            document.createElement("h2");
+
+        heading.className =
+            "section-title";
+
+        heading.textContent =
+            `${title} (${files.length})`;
+
+        container.appendChild(heading);
+
+
+        const grid =
+            document.createElement("div");
+
+        grid.className =
+            "grid";
+
+
+        files.forEach(file => {
+
+            grid.appendChild(
+                createCard(file)
+            );
+
+        });
+
+
+        container.appendChild(grid);
+
+    }
+
+
+    // Datei-Karte erstellen
+
+    function createCard(file) {
+
+        const card =
+            document.createElement("div");
+
+        card.className =
+            "card";
+
+
+        // Bildvorschau
+
+        if (file.type === "image") {
+
+            const img =
+                document.createElement("img");
+
+            img.src =
+                file.url;
+
+            img.loading =
+                "lazy";
+
+            img.alt =
+                file.name;
+
+            card.appendChild(img);
+
+        }
+
+
+        // Audio Player
+
+        if (file.type === "audio") {
+
+            const audio =
+                document.createElement("audio");
+
+            audio.controls =
+                true;
+
+            audio.preload =
+                "none";
+
+            audio.src =
+                file.url;
+
+            card.appendChild(audio);
+
+        }
+
+
+        // Dateiname
+
+        const filename =
+            document.createElement("div");
+
+        filename.className =
+            "filename";
+
+        filename.textContent =
+            file.name;
+
+        card.appendChild(filename);
+
+
+        // Dateipfad
+
+        const filepath =
+            document.createElement("div");
+
+        filepath.className =
+            "filepath";
+
+        filepath.textContent =
+            file.path;
+
+        card.appendChild(filepath);
+
+
+        // URL anzeigen
+
+        const url =
+            document.createElement("div");
+
+        url.className =
+            "url";
+
+        url.textContent =
+            file.url;
+
+        card.appendChild(url);
+
+
+        // Kopierbutton
+
+        const button =
+            document.createElement("button");
+
+        button.textContent =
+            "📋 URL kopieren";
+
+        button.addEventListener(
+            "click",
+            async () => {
+
+                try {
+
+                    await navigator.clipboard.writeText(
+                        file.url
+                    );
+
+                    button.textContent =
+                        "✓ URL kopiert";
+
+                    button.classList.add(
+                        "copied"
+                    );
+
+                    setTimeout(() => {
+
+                        button.textContent =
+                            "📋 URL kopieren";
+
+                        button.classList.remove(
+                            "copied"
+                        );
+
+                    }, 1500);
+
+                }
+
+                catch {
+
+                    alert(
+                        "URL konnte nicht kopiert werden:\n\n" +
+                        file.url
+                    );
+
+                }
+
+            }
+        );
+
+        card.appendChild(button);
+
+
+        return card;
+
+    }
+
+
+    // Suche
+
+    document
+        .getElementById("search")
+        .addEventListener(
+            "input",
+            event => {
+
+                const search =
+                    event.target.value
+                        .toLowerCase()
+                        .trim();
+
+                const filtered =
+                    allFiles.filter(file =>
+                        file.path
+                            .toLowerCase()
+                            .includes(search)
+                    );
+
+                renderFiles(filtered);
+
+            }
+        );
+
+
+    // Start
+
+    loadFiles();
+
+</script>
+
 </body>
 </html>
+```
